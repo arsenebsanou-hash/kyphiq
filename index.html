@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathIQ / PhysIQ - Science Quiz Challenge</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            background-color: #1e293b;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-width: 450px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 5px; }
+        .progress { font-size: 0.9rem; color: #94a3b8; margin-bottom: 15px; }
+        .question-box { font-size: 1.05rem; font-weight: 600; margin-bottom: 20px; line-height: 1.4; }
+        .btn {
+            background-color: #334155;
+            color: white;
+            border: none;
+            padding: 12px;
+            margin: 8px 0;
+            width: 100%;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: 0.2s;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn:hover { background-color: #475569; }
+        .btn-hint { background-color: #0284c7; margin-top: 15px; text-align: center; }
+        .btn-hint:hover { background-color: #0369a1; }
+        #feedback-box { margin: 15px 0; font-style: italic; min-height: 40px; color: #fbbf24; font-size: 0.95rem; }
+        #score-box { font-weight: bold; color: #4ade80; margin-top: 15px; font-size: 1.1rem; }
+        
+        /* Style pour l'alerte mème style Vegeta */
+        #meme-container {
+            display: none;
+            margin-top: 15px;
+            padding: 10px;
+            background: #7f1d1d;
+            border-radius: 8px;
+            border: 2px solid #ef4444;
+        }
+        #meme-container p {
+            color: #fca5a5;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <h1>⚡ MathIQ / PhysIQ</h1>
+        <div class="progress" id="progress-text">Question 1 sur 10</div>
+        
+        <div id="quiz-container">
+            <div class="question-box" id="question-text">Chargement...</div>
+            <div id="options-container"></div>
+            <div id="feedback-box"></div>
+            
+            <!-- Zone d'affichage du mème Vegeta -->
+            <div id="meme-container">
+                <p>💥 "J'AI MAL À LA TÊTE !" 💥</p>
+                <audio id="vegeta-audio" src="https://www.myinstants.com/media/sounds/vegeta-gros-cri.mp3" preload="auto"></audio>
+            </div>
+
+            <button class="btn btn-hint" id="hint-btn" onclick="watchAdForHint()">🎁 Regarder une pub pour un indice</button>
+        </div>
+        <div id="score-box">Score : 0 pts</div>
+    </div>
+
+    <script>
+        const quizData = [
+            {
+                question: "Quelle est la dérivée de f(x) = x^2 ? / Derivative of f(x) = x^2?",
+                options: ["x", "2x", "x^2 / 2", "2"],
+                correct: 1,
+                hint: "Règle de puissance : d/dx (x^n) = n*x^(n-1)"
+            },
+            {
+                question: "Unité du champ magnétique (SI) ? / SI unit for magnetic field?",
+                options: ["Tesla (T)", "Weber (Wb)", "Gauss (G)", "Newton (N)"],
+                correct: 0,
+                hint: "Nommé d'après l'inventeur et ingénieur Nikola Tesla."
+            },
+            {
+                question: "En langage C, que fait la fonction malloc() ? / In C, what does malloc() do?",
+                options: ["Libère de la mémoire", "Alloue de la mémoire dynamique", "Compile le code source", "Crée une boucle infinie"],
+                correct: 1,
+                hint: "Vient de l'anglais 'Memory Allocation'."
+            }
+        ];
+
+        let currentQuestion = 0;
+        let score = 0;
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'fr-FR';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function loadQuestion() {
+            if (currentQuestion >= quizData.length) {
+                document.getElementById('app').innerHTML = `
+                    <h1>🎉 Quiz Terminé !</h1>
+                    <p style="margin: 20px 0; font-size: 1.1rem;">Score final : <strong>${score}</strong> / ${quizData.length * 100}</p>
+                    <button class="btn btn-hint" onclick="location.reload()">Rejouer / Play Again</button>
+                `;
+                return;
+            }
+
+            const q = quizData[currentQuestion];
+            document.getElementById('progress-text').innerText = `Question ${currentQuestion + 1} sur ${quizData.length}`;
+            document.getElementById('question-text').innerText = q.question;
+            document.getElementById('feedback-box').innerText = "";
+            document.getElementById('meme-container').style.display = "none";
+            
+            const optionsDiv = document.getElementById('options-container');
+            optionsDiv.innerHTML = '';
+            
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn';
+                btn.innerText = `${index + 1}) ${opt}`;
+                btn.onclick = () => checkAnswer(index);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selected) {
+            const q = quizData[currentQuestion];
+            const feedbackBox = document.getElementById('feedback-box');
+            const memeContainer = document.getElementById('meme-container');
+            const audio = document.getElementById('vegeta-audio');
+
+            if (selected === q.correct) {
+                score += 100;
+                memeContainer.style.display = "none";
+                let msg = "Exceptionnel ! C'est du génie pur !";
+                feedbackBox.style.color = "#4ade80";
+                feedbackBox.innerText = "✅ " + msg;
+                speak(msg);
+            } else {
+                // Mauvaise réponse : on déclenche le mème Vegeta !
+                feedbackBox.style.color = "#f87171";
+                feedbackBox.innerText = "❌ ERREUR CRITIQUE ! C'est catastrophique !";
+                memeContainer.style.display = "block";
+                
+                // Jouer le son du cri de Vegeta
+                if(audio) {
+                    audio.currentTime = 0;
+                    audio.play().catch(e => console.log("Audio bloqué par le navigateur"));
+                }
+                
+                speak("J'ai mal à la tête ! C'est un désastre absolu !");
+            }
+
+            currentQuestion++;
+            document.getElementById('score-box').innerText = `Score : ${score} pts`;
+            
+            setTimeout(() => {
+                loadQuestion();
+            }, 4000);
+        }
+
+        function watchAdForHint() {
+            let confirmAd = confirm("▶ [SIMULATION ADMOB] Regarder une vidéo publicitaire pour l'indice ?");
+            if (confirmAd) {
+                alert("💡 Indice : " + quizData[currentQuestion].hint);
+            }
+        }
+
+        loadQuestion();
+    </script>
+</body>
+</html>
